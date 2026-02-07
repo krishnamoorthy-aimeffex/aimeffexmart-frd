@@ -1,6 +1,7 @@
 import axios from "axios";
+import.meta.env;
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -58,7 +59,7 @@ export interface AuthResponse {
  * User Signup
  */
 export const signup = async (data: SignupData): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>("/api/auth/signup", data);
+  const response = await apiClient.post<AuthResponse>("/auth/signup", data);
   return response.data;
 };
 
@@ -66,7 +67,7 @@ export const signup = async (data: SignupData): Promise<AuthResponse> => {
  * User Login
  */
 export const login = async (data: LoginData): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>("/api/auth/login", data);
+  const response = await apiClient.post<AuthResponse>("/auth/login", data);
   return response.data;
 };
 
@@ -74,7 +75,7 @@ export const login = async (data: LoginData): Promise<AuthResponse> => {
  * Get current user profile
  */
 export const getProfile = async () => {
-  const response = await apiClient.get("/api/auth/profile");
+  const response = await apiClient.get("/auth/profile");
   return response.data;
 };
 

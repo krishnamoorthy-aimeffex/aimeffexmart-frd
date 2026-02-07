@@ -1,9 +1,10 @@
 // src/pages/Login.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Mail, Lock, Eye, EyeOff, ShoppingBag, Phone } from "lucide-react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import { login as loginAPI } from "../../api/auth.api";
+import Spinner from "../../components/ui/Spinner";
 import { FcGoogle } from "react-icons/fc";
 import { useNavigate } from "react-router-dom";
 
@@ -12,7 +13,20 @@ function Login() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    // Simulate 1 second loading delay
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isPageLoading) {
+    return <Spinner />;
+  }
 
   // ✅ OAuth handlers (frontend-only for now)
   const handleGoogleLogin = () => {

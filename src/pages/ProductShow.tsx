@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ShoppingCart, Star } from "lucide-react";
 import BackBtn from "../components/ui/BackBtn";
+import Spinner from "../components/ui/Spinner";
+import Header from "../components/dashboad/Header";
+import { getProductById } from "../api/product.api";
+import cartApi from "../api/cart.api";
 
 interface Product {
+  _id?: string;
   id: number | string;
   name: string;
   image?: string;
@@ -20,24 +25,70 @@ function ProductShow() {
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [inCart, setInCart] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const isLoggedIn = !!localStorage.getItem("token");
 
   const CART_KEY = "cart";
 
   useEffect(() => {
+    // Simulate 1 second loading delay
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (!id) return;
     setLoading(true);
-    fetch("/Product.json")
-      .then((r) => r.json())
-      .then((list: Product[]) => {
-        const found = list.find((p) => String(p.id) === String(id));
+
+    const fetchProduct = async () => {
+      try {
+        // Try backend API first
+        try {
+          const res = await getProductById(String(id));
+          const p = res.data || res;
+          if (p) {
+            const normalized: Product = {
+              _id: p._id || p.id,
+              id: p._id || p.id,
+              name: p.name,
+              image: p.image,
+              badge: p.badge,
+              rating: p.rating,
+              reviews: p.reviews,
+              price: p.price,
+              originalPrice: p.originalPrice,
+              description: p.description,
+            };
+            setProduct(normalized);
+            setInCart(getList(CART_KEY).some((q) => String(q.id) === String(normalized.id)));
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          // ignore and fallback to static JSON
+        }
+
+        // Fallback to local Product.json
+        const list: Product[] = await fetch("/Product.json").then((r) => r.json());
+        const found = list.find(
+          (p) => String(p.id) === String(id) || String((p as any)._id) === String(id)
+        );
         setProduct(found ?? null);
         if (found) {
-          setInCart(getList(CART_KEY).some((p) => p.id === found.id));
+          setInCart(getList(CART_KEY).some((p) => String(p.id) === String(found.id)));
         }
-      })
-      .catch(() => setProduct(null))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        setProduct(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProduct();
   }, [id]);
 
   function getList(key: string): Product[] {
@@ -62,17 +113,87 @@ function ProductShow() {
 
 
   function addToCart(p: Product) {
-    const list = getList(CART_KEY);
-    const exists = list.some((x) => x.id === p.id);
-    const next = exists ? list : [p, ...list];
-    saveList(CART_KEY, next);
-    setInCart(true);
+    if (!isLoggedIn) {
+      navigate("/auth/login");
+      return;
+    }
+
+    // Skip if already in cart
+    if (inCart) {
+      return;
+    }
+
+    // Logged-in flow: add to backend cart
+    (async () => {
+      try {
+        const productId = String((p as any)._id || p.id);
+        await cartApi.addToCart(productId, 1);
+        setInCart(true);
+      } catch (err) {
+        console.error("Failed to add to backend cart", err);
+      }
+    })();
   }
 
-  if (loading) return <div className="p-8">Loading…</div>;
+  // Determine cart membership: use backend for logged-in users, localStorage for guests
+  useEffect(() => {
+    if (!product) return;
+
+    const check = async () => {
+      if (isLoggedIn) {
+        try {
+          const res = await cartApi.getCart();
+          const raw = res && (res.data || res);
+          const items = Array.isArray(raw) ? raw : (raw?.data || raw?.items || raw?.data?.data || []);
+          const found = (items || []).find((it: any) => {
+            const pid = it.productId?._id || it.productId;
+            return String(pid) === String(product.id) || String(pid) === String((product as any)._id);
+          });
+          setInCart(!!found);
+        } catch (err) {
+          console.error("Failed to fetch backend cart", err);
+          const exists = getList(CART_KEY).some((x) => String(x.id) === String(product.id));
+          setInCart(exists);
+        }
+      } else {
+        const exists = getList(CART_KEY).some((x) => String(x.id) === String(product.id));
+        setInCart(exists);
+      }
+    };
+
+    check();
+  }, [product, isLoggedIn]);
+
+  function isCurrentlyInCart() {
+    return inCart;
+  }
+
+  if (isPageLoading) {
+    return <Spinner />;
+  }
+
+  if (loading)
+    return (
+      <>
+        <Header
+          isLoggedIn={isLoggedIn}
+          cartCount={0}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
+        <div className="p-8">Loading…</div>
+      </>
+    );
   if (!product)
     return (
-      <div className="min-h-screen flex items-center justify-center p-8">
+      <>
+        <Header
+          isLoggedIn={isLoggedIn}
+          cartCount={0}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
+        <div className="min-h-screen flex items-center justify-center p-8">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Product not found</h2>
           <p className="text-gray-500 mt-2">No product matches the id {id}</p>
@@ -84,10 +205,17 @@ function ProductShow() {
           </button>
         </div>
       </div>
+      </>
     );
 
   return (
     <>
+      <Header
+        isLoggedIn={isLoggedIn}
+        cartCount={0}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
       <div className="ml-4 mt-3">
         <BackBtn />
       </div>
@@ -112,11 +240,11 @@ function ProductShow() {
               </div>
             </div>
             <div className="text-2xl font-bold text-purple-600 mb-4">
-              ${product.price}
+              ₹{product.price}
             </div>
             {product.originalPrice && (
               <div className="text-sm text-gray-400 line-through mb-4">
-                ${product.originalPrice}
+                ₹{product.originalPrice}
               </div>
             )}
             <p className="text-gray-700 mb-6">
@@ -129,9 +257,9 @@ function ProductShow() {
                 className="px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg flex items-center gap-2 cursor-pointer"
               >
                 <ShoppingCart className="w-4 h-4" />
-                {inCart ? 'Added' : 'Add to Cart'}
+                {isCurrentlyInCart() ? "Added" : "Add to Cart"}
               </button>
-              <button className="px-13 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg flex items-center gap-2 cursor-pointer">
+              <button className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg flex items-center gap-2 cursor-pointer">
                 <ShoppingCart className="w-4 h-4" />
                 Buy
               </button>

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Spinner from "../../components/ui/Spinner";
 
 function OAuthSuccess() {
   const navigate = useNavigate();
@@ -27,33 +28,26 @@ function OAuthSuccess() {
           user: localStorage.getItem("user"),
         }); // Debug log
 
-        // ✅ Use window.location.href for reliable redirect
+        // ✅ Use window.location.href for reliable redirect after 1 second
         setTimeout(() => {
           window.location.href = "/";
-        }, 500);
+        }, 1000);
       } catch (error) {
         console.error("Failed to parse user data:", error);
         setTimeout(() => {
-          navigate("/login");
-        }, 500);
+          navigate("/auth/login");
+        }, 1000);
       }
     } else {
       console.error("Missing token or user data in URL");
       console.log("Full URL:", window.location.href); // Debug log
       setTimeout(() => {
-        navigate("/login");
-      }, 500);
+        navigate("/auth/login");
+      }, 1000);
     }
   }, [navigate]);
 
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <p className="text-lg font-semibold text-gray-700">Signing you in...</p>
-        <p className="text-sm text-gray-500 mt-2">Please wait a moment</p>
-      </div>
-    </div>
-  );
+  return <Spinner />;
 }
 
 export default OAuthSuccess;
