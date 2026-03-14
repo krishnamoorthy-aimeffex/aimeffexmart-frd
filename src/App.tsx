@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import Login from "./pages/auth/login";
 import Signup from "./pages/auth/signup";
-import Home from "./pages/Home";
+import Home from "./pages/home";
 import Profile from "./pages/Profile";
 import Wishlist from "./pages/Wishlist";
 import Cart from "./pages/Cart";
